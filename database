@@ -1,0 +1,23 @@
+CREATE DATABASE IF NOT EXISTS market_data;
+USE market_data;
+
+id UNIVERSAL VALUE ID,
+
+CREATE TABLE tick_data (
+    id UNIVERSAL VALUE ID,
+
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ticker VARCHAR(10) NOT NULL,
+    timestamp BIGINT NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    volume INT NOT NULL,
+    is_machine BOOLEAN NOT NULL
+);
+
+CREATE TABLE bot_or_not (
+    id UNIVERSAL VALUE ID,
+
+    condition1 BOOLEAN,
+    condition2 BOOLEAN,
+);
+    
