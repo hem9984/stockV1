@@ -1,12 +1,8 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- */
-
 package com.mycompany.stockv1;
 
 /**
  *
- * @author hemgr
+ * @author brian
  */
 import com.bloomberglp.blpapi.*;
 import java.sql.Connection;
@@ -15,6 +11,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Calendar;
+import java.text.SimpleDateFormat;
 
 class BloombergDataFetcher {
     private static final String BLOOMBERG_SERVER = "localhost";
@@ -36,10 +34,59 @@ class BloombergDataFetcher {
             Request request = refDataService.createRequest("IntradayTickRequest");
             request.set("security", ticker);
             request.append("eventTypes", "TRADE");
-            request.set("startDateTime", "2024-05-01T09:30:00");
-            request.set("endDateTime", "2024-05-01T16:00:00");
+            //request.append("eventTypes", "BID"); //A request can have multiple eventTypes
+            //Note 1) refDataService.ToString() using the Bloomberg API indicates an additional eventType called "SETTLE".  "SETTLE" doesn't seem to produce any results.
+            //Note 2) If you request an eventType that isn't supported, the API will throw a KeyNotSupportedException at the "request.Append("eventType", "XXX")" line
+            //Note 3) eventType values are case-sensitive.  Requesting "bid" instead of "BID" will throw a KeyNotSupportedException at the "request.Append("eventType", "bid")" line
+            
+            { //dates
+            	
+            	//goes back at most 140 days (documentation section 7.2.3)
+	            Calendar cStart = Calendar.getInstance();
+	            cStart.add(Calendar.DAY_OF_MONTH, -3);
+	            cStart.set(Calendar.HOUR, 2);
+	            cStart.set(Calendar.MINUTE, 0);
+				Datetime dtStart = new Datetime(cStart);	
+				request.set("startDateTime", dtStart);		
+	
+	            Calendar cEnd = Calendar.getInstance();
+	            cEnd.add(Calendar.DAY_OF_MONTH, -3);
+	            cEnd.set(Calendar.HOUR, 3);
+	            cEnd.set(Calendar.MINUTE, 0);
+				Datetime dtEnd = new Datetime(cEnd);
+				request.set("endDateTime", dtEnd);
+            }
 
-            session.sendRequest(request, null);
+//            //A comma delimited list of exchange condition codes associated with the event. Review QR<GO> for more information on each code returned.
+//            request.set("includeConditionCodes", false); //Optional bool. Valid values are true and false (default = false)
+//
+//            //Returns all ticks, including those with condition codes.
+//            request.set("includeNonPlottableEvents", false); //Optional bool. Valid values are true and false (default = false)
+//
+//            //The exchange code where this tick originated. Review QR<GO> for more information.
+//            request.set("includeExchangeCodes", false); //Optional bool. Valid values are true and false (default = false)
+//
+//            //Option on whether to return EIDs for the security.
+//            request.set("returnEids", false); //Optional bool. Valid values are true and false (default = false)
+//
+//            //The broker code for Canadian, Finnish, Mexican, Philippine, and Swedish equities only.
+//            //  The Market Maker Lookup screen, MMTK<GO>, displays further information on market makers and their corresponding codes.
+//            request.set("includeBrokerCodes", false); //Optional bool. Valid values are true and false (default = false)
+//
+//            //The Reporting Party Side. The following values appear:
+//            //  -B: A customer transaction where the dealer purchases securities from the customer.
+//            //  -S: A customer transaction where the dealer sells securities to the customer.
+//            //  -D: An inter-dealer transaction (always from the sell side).
+//            request.set("includeRpsCodes", false); //Optional bool. Valid values are true and false (default = false)
+//
+//            //The BIC, or Bank Identifier Code, as a 4-character unique identifier for each bank that executed and reported the OTC trade, as required by MiFID.
+//            //  BICs are assigned and maintained by SWIFT (Society for Worldwide Interbank Financial Telecommunication).
+//            //  The MIC is the Market Identifier Code, and this indicates the venue on which the trade was executed.
+//            request.set("includeBicMicCodes", false); //Optional bool. Valid values are true and false (default = false)
+            
+
+            // CorrelationID corr = new CorrelationID(17);
+            session.sendRequest(request, null); //(request, corr);
 
             boolean continueLoop = true;
             while (continueLoop) {
@@ -172,11 +219,6 @@ class TickData {
 }
 
 public class StockV1 {
-    // MariaDB Database Credentials
-    private static final String DB_URL = "jdbc:mariadb://localhost:3306/market_data";
-    private static final String DB_USER = "your_username";
-    private static final String DB_PASSWORD = "your_password";
-
     public static void main(String[] args) {
         // Create sector and stock
         Sector sector = new Sector("S&P 500");
@@ -184,7 +226,13 @@ public class StockV1 {
 
         // Fetch data from Bloomberg API
         try {
+            System.out.println("Fetching data from Bloomberg API...");
             List<TickData> tickDataList = BloombergDataFetcher.fetchTickData("AAPL US Equity");
+            if (tickDataList.isEmpty()) {
+                System.out.println("No data received from Bloomberg API.");
+            } else {
+                System.out.println("Data received: " + tickDataList.size() + " ticks");
+            }
             stock.setTickData(tickDataList);
         } catch (Exception e) {
             System.err.println("Error fetching Bloomberg data: " + e.getMessage());
@@ -192,20 +240,64 @@ public class StockV1 {
         }
 
         // Classify tick data
+        System.out.println("Classifying tick data...");
         stock.classifyTickData();
 
         // Add stock to sector
         sector.addStock(stock);
 
-        // Insert classified tick data into MariaDB
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-            for (Stock s : sector.getStocks()) {
-                s.saveToDatabase(conn);
-            }
-            System.out.println("Data has been successfully inserted into the database.");
-        } catch (SQLException e) {
-            System.err.println("SQL Exception: " + e.getMessage());
+        // Print transactions
+        System.out.println("Printing transactions...");
+        printTransactions(stock);
+    }
+
+    // Function to print transactions of the given stock
+    private static void printTransactions(Stock stock) {
+        System.out.println("Transactions for ticker: " + stock.getTickerSymbol());
+        List<TickData> tickDataList = stock.getTickData();
+        for (TickData tickData : tickDataList) {
+            System.out.println(tickData);
+        }
+        if (tickDataList.isEmpty()) {
+            System.out.println("No transaction data available to print.");
         }
     }
 }
 
+//public class StockV1 {
+//    // MariaDB Database Credentials
+//    private static final String DB_URL = "jdbc:mariadb://localhost:3306/market_data";
+//    private static final String DB_USER = "your_username";
+//    private static final String DB_PASSWORD = "your_password";
+//
+//    public static void main(String[] args) {
+//        // Create sector and stock
+//        Sector sector = new Sector("S&P 500");
+//        Stock stock = new Stock("AAPL");
+//
+//        // Fetch data from Bloomberg API
+//        try {
+//            List<TickData> tickDataList = BloombergDataFetcher.fetchTickData("AAPL US Equity");
+//            stock.setTickData(tickDataList);
+//        } catch (Exception e) {
+//            System.err.println("Error fetching Bloomberg data: " + e.getMessage());
+//            return;
+//        }
+//
+//        // Classify tick data
+//        stock.classifyTickData();
+//
+//        // Add stock to sector
+//        sector.addStock(stock);
+//
+//        // Insert classified tick data into MariaDB
+//        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+//            for (Stock s : sector.getStocks()) {
+//                s.saveToDatabase(conn);
+//            }
+//            System.out.println("Data has been successfully inserted into the database.");
+//        } catch (SQLException e) {
+//            System.err.println("SQL Exception: " + e.getMessage());
+//        }
+//    }
+//}
