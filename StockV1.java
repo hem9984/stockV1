@@ -290,9 +290,9 @@ public class StockV1 {
     // Fetch data back from database
     private static List<Transaction> fetchTransactionsFromDatabase() {
         List<Transaction> transactions = new ArrayList<>();
-        String url = "jdbc:mariadb://localhost:3306/yourDatabase";
-        String username = "yourUsername";
-        String password = "yourPassword";
+        String url = "jdbc:mariadb://localhost:3306/StockV1";
+        String username = "root";
+        String password = "Sinatra147!";
 
         String query = "SELECT ticker, timestamp, price, volume, is_machine FROM yourTable";
 
