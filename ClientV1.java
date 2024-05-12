@@ -1,9 +1,6 @@
 package com.mycompany.stockv1;
 
-/**
- *
- * @author brian
- */
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -25,30 +22,6 @@ public class ClientV1 extends JFrame {
     private boolean sortSizeAsc = false;
     private boolean sortDateAsc = false;
     private boolean sortBotAsc = false;
-
-    // Mock transaction class to hold relevant data
-    private static class Transaction implements Serializable {
-        String ticker;
-        boolean bot;
-        double costPerShare;
-        int orderSize;
-        String dateTime;
-
-        public Transaction(String ticker, boolean bot, double costPerShare, int orderSize, String dateTime) {
-            this.ticker = ticker;
-            this.bot = bot;
-            this.costPerShare = costPerShare;
-            this.orderSize = orderSize;
-            this.dateTime = dateTime;
-        }
-
-        @Override
-        public String toString() {
-            String botLabel = bot ? "Bot: Yes" : "Bot: No";
-            return String.format("%s | %s | Cost/Share: $%.2f | Size: %d | Date/Time: %s",
-                    ticker, botLabel, costPerShare, orderSize, dateTime);
-        }
-    }
 
     // Custom panel to represent the placeholder graph
     private static class ProbabilityGraphPanel extends JPanel {
