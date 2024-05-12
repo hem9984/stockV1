@@ -16,28 +16,31 @@ public class ClientV1 extends JFrame {
     private JList<Transaction> transactionsList;
     private DefaultListModel<Transaction> listModel;
     private JPanel detailsPanel;
-    private ProbabilityGraphPanel graphPanel;
+    private StockGraphPanel graphPanel;
     private JTextField searchBar;
     private boolean sortCostAsc = false;
     private boolean sortSizeAsc = false;
     private boolean sortDateAsc = false;
     private boolean sortBotAsc = false;
 
-    // Custom panel to represent the placeholder graph
-    private static class ProbabilityGraphPanel extends JPanel {
+    // Custom Stock price over time graph
+    public class StockGraphPanel extends JPanel {
+        private List<Transaction> transactions = new ArrayList<>();
         private boolean visible = true;
+        private static final int PADDING = 25;
+        private static final int LABEL_PADDING = 25;
+        private static final String TITLE = "Stock Price Over Time";
+        private static final String X_AXIS_LABEL = "Time (Transactions)";
+        private static final String Y_AXIS_LABEL = "Cost per Share ($)";
 
-        public ProbabilityGraphPanel() {
+        public StockGraphPanel() {
             setPreferredSize(new Dimension(400, 200));
             setBorder(BorderFactory.createLineBorder(Color.BLACK));
         }
 
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            if (visible) {
-                drawPlaceholderGraph(g);
-            }
+        public void setTransactions(List<Transaction> transactions) {
+            this.transactions = transactions;
+            repaint(); // Redraw the panel with new data
         }
 
         public void setGraphVisible(boolean visible) {
@@ -45,15 +48,50 @@ public class ClientV1 extends JFrame {
             repaint();
         }
 
-        private void drawPlaceholderGraph(Graphics g) {
-            g.setColor(Color.BLACK);
-            g.drawString("Probability Distribution Graph", 110, 20);
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (!visible || transactions.isEmpty()) return;
 
-            // Simulate a normal distribution curve
+            // Initialize the graphics and dimensions
             g.setColor(Color.BLUE);
-            int[] xPoints = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360, 370, 380, 390};
-            int[] yPoints = {190, 180, 170, 155, 135, 120, 100, 90, 70, 60, 55, 60, 70, 90, 100, 120, 135, 155, 170, 180, 190, 180, 170, 155, 135, 120, 100, 90, 70, 60, 55, 60, 70, 90, 100, 120, 135, 155, 170};
-            g.drawPolyline(xPoints, yPoints, xPoints.length);
+            int width = getWidth();
+            int height = getHeight();
+            int graphWidth = width - 2 * (PADDING + LABEL_PADDING);
+            int graphHeight = height - 2 * (PADDING + LABEL_PADDING);
+
+            // Find min and max values
+            double minPrice = Double.MAX_VALUE;
+            double maxPrice = Double.MIN_VALUE;
+            for (Transaction transaction : transactions) {
+                double price = transaction.costPerShare;
+                minPrice = Math.min(minPrice, price);
+                maxPrice = Math.max(maxPrice, price);
+            }
+
+            // Draw title
+            g.setColor(Color.BLACK);
+            g.setFont(new Font("SansSerif", Font.BOLD, 14));
+            g.drawString(TITLE, (width - g.getFontMetrics().stringWidth(TITLE)) / 2, PADDING);
+
+            // Draw axes
+            g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            g.drawLine(PADDING + LABEL_PADDING, height - PADDING - LABEL_PADDING, PADDING + LABEL_PADDING, PADDING);
+            g.drawLine(PADDING + LABEL_PADDING, height - PADDING - LABEL_PADDING, width - PADDING, height - PADDING - LABEL_PADDING);
+
+            // Draw axis labels
+            g.drawString(Y_AXIS_LABEL, PADDING, (height - graphHeight) / 2);
+            g.drawString(X_AXIS_LABEL, (width - g.getFontMetrics().stringWidth(X_AXIS_LABEL)) / 2, height - PADDING);
+
+            // Draw the line graph between points
+            int numPoints = transactions.size();
+            for (int i = 0; i < numPoints - 1; i++) {
+                int x1 = PADDING + LABEL_PADDING + (i * graphWidth / (numPoints - 1));
+                int x2 = PADDING + LABEL_PADDING + ((i + 1) * graphWidth / (numPoints - 1));
+                int y1 = height - PADDING - LABEL_PADDING - (int)((transactions.get(i).costPerShare - minPrice) * graphHeight / (maxPrice - minPrice));
+                int y2 = height - PADDING - LABEL_PADDING - (int)((transactions.get(i + 1).costPerShare - minPrice) * graphHeight / (maxPrice - minPrice));
+                g.drawLine(x1, y1, x2, y2);
+            }
         }
     }
 
@@ -65,6 +103,7 @@ public class ClientV1 extends JFrame {
             if (value instanceof Transaction) {
                 Transaction transaction = (Transaction) value;
                 label.setText(transaction.toString());
+                // Add a small indicator color circle
                 label.setIcon(new IndicatorIcon(transaction.bot));
             }
             return label;
@@ -138,8 +177,10 @@ public class ClientV1 extends JFrame {
         // List of transactions
         listModel = new DefaultListModel<>();
         transactionsList = new JList<>(listModel);
+        transactionsList.setCellRenderer(new TransactionCellRenderer());
         transactionsList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         transactionsList.setVisibleRowCount(-1);
+        transactionsList.addListSelectionListener(e -> updateDetailsPanel(transactionsList.getSelectedIndex()));
         JScrollPane transactionScrollPane = new JScrollPane(transactionsList);       
         
         // Combine sorting buttons, search bar, and transaction list
@@ -154,7 +195,7 @@ public class ClientV1 extends JFrame {
         rightPanel.setPreferredSize(new Dimension(400, 600));
 
         // Placeholder for graph
-        graphPanel = new ProbabilityGraphPanel();
+        graphPanel = new StockGraphPanel();
         graphPanel.setGraphVisible(false);
 
         // Placeholder for details
@@ -201,6 +242,7 @@ public class ClientV1 extends JFrame {
                 for (Transaction transaction : transactions) {
                     listModel.addElement(transaction);
                 }
+                graphPanel.setTransactions(transactions);
             });
 
         } catch (Exception e) {
@@ -221,7 +263,7 @@ public class ClientV1 extends JFrame {
             detailsPanel.add(new JLabel("Order Size: " + transaction.orderSize));
             detailsPanel.add(new JLabel("Date/Time: " + transaction.dateTime));
             detailsPanel.add(new JLabel("Transaction ID: " + (1000 + index)));
-            detailsPanel.add(new JLabel("Company Name: ABC Corporation"));
+            detailsPanel.add(new JLabel("Company Name: Apple Inc."));
             detailsPanel.add(new JLabel("Additional metrics can go here."));
 
             graphPanel.setGraphVisible(true);
