@@ -294,7 +294,7 @@ public class StockV1 {
         String username = "root";
         String password = "Sinatra147!";
 
-        String query = "SELECT ticker, timestamp, price, volume, is_machine FROM yourTable";
+        String query = "SELECT ticker, timestamp, price, volume, is_machine FROM tick_data";
 
         try (Connection conn = DriverManager.getConnection(url, username, password);
              PreparedStatement stmt = conn.prepareStatement(query);
