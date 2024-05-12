@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Calendar;
 
 class BloombergDataFetcher {
-    private static final String BLOOMBERG_SERVER = "localhost";
+    private static final String BLOOMBERG_SERVER = "127.0.0.1";
     private static final int BLOOMBERG_PORT = 8194;
 
     public static List<TickData> fetchTickData(String ticker) throws Exception {
@@ -33,6 +33,8 @@ class BloombergDataFetcher {
             Request request = refDataService.createRequest("IntradayTickRequest");
             request.set("security", ticker);
             request.append("eventTypes", "TRADE");
+            request.set("includeExchangeCodes", true);  // Include exchange codes
+            request.set("includeBrokerCodes", true);    // Include broker codes
 
             Calendar cStart = Calendar.getInstance();
             cStart.add(Calendar.DAY_OF_MONTH, -2);
@@ -43,24 +45,29 @@ class BloombergDataFetcher {
             cEnd.add(Calendar.DAY_OF_MONTH, -1);
             request.set("endDateTime", new Datetime(cEnd));
 
-            session.sendRequest(request, null);
+            CorrelationID correlationId = new CorrelationID(1);
+            session.sendRequest(request, correlationId);
 
-            while (true) {
+            boolean continueLoop = true;
+            while (continueLoop) {
                 Event event = session.nextEvent();
-                if (event.eventType() == Event.EventType.RESPONSE) {
-                    MessageIterator msgIterator = event.messageIterator();
-                    while (msgIterator.hasNext()) {
-                        Message msg = msgIterator.next();
+                MessageIterator msgIterator = event.messageIterator();
+                while (msgIterator.hasNext()) {
+                    Message msg = msgIterator.next();
+                    if (event.eventType() == Event.EventType.RESPONSE || event.eventType() == Event.EventType.PARTIAL_RESPONSE) {
                         Element data = msg.getElement("tickData").getElement("tickData");
                         for (int i = 0; i < data.numValues(); i++) {
                             Element tick = data.getValueAsElement(i);
                             long timestamp = tick.getElementAsDatetime("time").calendar().getTimeInMillis();
                             double price = tick.getElementAsFloat64("value");
                             int volume = tick.getElementAsInt32("size");
-                            tickDataList.add(new TickData(timestamp, price, volume));
+                            String exchangeCode = tick.hasElement("exchangeCode") ? tick.getElementAsString("exchangeCode") : "N/A";
+                            String brokerCode = tick.hasElement("brokerCode") ? tick.getElementAsString("brokerCode") : "N/A";
+
+                            tickDataList.add(new TickData(timestamp, price, volume, exchangeCode, brokerCode));
                         }
+                        continueLoop = event.eventType() != Event.EventType.RESPONSE;
                     }
-                    break;
                 }
             }
         } finally {
@@ -69,7 +76,6 @@ class BloombergDataFetcher {
 
         return tickDataList;
     }
-
 }
 
 class Sector {
@@ -140,12 +146,16 @@ class TickData {
     private long timestamp;
     private double price;
     private int volume;
+    private String exchangeCode;
+    private String brokerCode;
     private String classification;
 
-    public TickData(long timestamp, double price, int volume) {
+    public TickData(long timestamp, double price, int volume, String exchangeCode, String brokerCode) {
         this.timestamp = timestamp;
         this.price = price;
         this.volume = volume;
+        this.exchangeCode = exchangeCode;
+        this.brokerCode = brokerCode;
     }
 
     public long getTimestamp() {
@@ -160,6 +170,14 @@ class TickData {
         return volume;
     }
 
+    public String getExchangeCode() {
+        return exchangeCode;
+    }
+
+    public String getBrokerCode() {
+        return brokerCode;
+    }
+
     public String getClassification() {
         return classification;
     }
@@ -170,16 +188,16 @@ class TickData {
 
     @Override
     public String toString() {
-        return String.format("Time: %d, Price: %.2f, Volume: %d, Classification: %s",
-                             timestamp, price, volume, classification);
+        return String.format("Time: %d, Price: %.2f, Volume: %d, Exchange: %s, Broker: %s, Classification: %s",
+                             timestamp, price, volume, exchangeCode, brokerCode, classification);
     }
 }
 
 public class StockV1 {
     // MariaDB Database Credentials
     private static final String DB_URL = "jdbc:mariadb://localhost:3306/market_data";
-    private static final String DB_USER = "your_username";
-    private static final String DB_PASSWORD = "your_password";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "YOUR_PASSWORD";
     
     public static void main(String[] args) {
         // Create sector and stock
