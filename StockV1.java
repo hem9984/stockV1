@@ -200,9 +200,9 @@ class TickData {
 
 public class StockV1 {
     // MariaDB Database Credentials
-    private static final String DB_URL = "jdbc:mariadb://localhost:3306/StockV1";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/StockV1";
     private static final String DB_USER = "root";
-    private static final String DB_PASSWORD = "Sinatra147!";
+    private static final String DB_PASSWORD = "H0tR0d-505";
     
     // Networking Port
     private static final int PORT = 12345;
@@ -274,13 +274,9 @@ public class StockV1 {
     // Fetch data back from database
     private static List<Transaction> fetchTransactionsFromDatabase() {
         List<Transaction> transactions = new ArrayList<>();
-        String url = "jdbc:mariadb://localhost:3306/StockV1";
-        String username = "root";
-        String password = "Sinatra147!";
-
         String query = "SELECT ticker, timestamp, price, volume, is_machine FROM tick_data";
 
-        try (Connection conn = DriverManager.getConnection(url, username, password);
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
              PreparedStatement stmt = conn.prepareStatement(query);
              ResultSet rs = stmt.executeQuery()) {
 
