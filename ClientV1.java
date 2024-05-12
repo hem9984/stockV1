@@ -1,4 +1,4 @@
-package com.mycompany.stockmarketanalysisui;
+package com.mycompany.stockv1;
 
 /**
  *
@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.io.*;
 import java.net.Socket;
 
-public class StockMarketAnalysisUI extends JFrame {
+public class ClientV1 extends JFrame {
     private JList<Transaction> transactionsList;
     private DefaultListModel<Transaction> listModel;
     private JPanel detailsPanel;
@@ -124,7 +124,7 @@ public class StockMarketAnalysisUI extends JFrame {
         }
     }
 
-    public StockMarketAnalysisUI() {
+    public ClientV1() {
         // Initialize main frame
         setTitle("Stock Market Analysis");
         setSize(900, 600);
@@ -211,21 +211,24 @@ public class StockMarketAnalysisUI extends JFrame {
         fetchTransactionsFromServer();
     }
     
+    // Function to fetch transactions from the server and populate the list
     private void fetchTransactionsFromServer() {
-        String serverAddress = "10.18.185.141";
-        int serverPort = 12345;
+        String serverAddress = "localhost"; // Update with actual server address if necessary
+        int serverPort = 12345; // Ensure the server port matches your server configuration
 
         try (Socket socket = new Socket(serverAddress, serverPort);
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
-            // Receive the list of transactions from the server
+            // Read the list of transactions from the server
             List<Transaction> transactions = (List<Transaction>) in.readObject();
 
-            // Clear the current list and add the fetched transactions
-            listModel.clear();
-            for (Transaction transaction : transactions) {
-                listModel.addElement(transaction);
-            }
+            // Update the UI list model with the transactions received
+            SwingUtilities.invokeLater(() -> {
+                listModel.clear();
+                for (Transaction transaction : transactions) {
+                    listModel.addElement(transaction);
+                }
+            });
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -336,7 +339,7 @@ public class StockMarketAnalysisUI extends JFrame {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            StockMarketAnalysisUI app = new StockMarketAnalysisUI();
+            ClientV1 app = new ClientV1();
             app.setVisible(true);
         });
     }
