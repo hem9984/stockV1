@@ -110,7 +110,7 @@ public class ClientV1 extends JFrame {
 
         // Sorting buttons
         JPanel sortButtons = new JPanel(new GridLayout(1, 4, 5, 0));
-        JButton sortByBot = new JButton("Bot");
+        JButton sortByBot = new JButton("Bot or not");
         JButton sortByCost = new JButton("Cost/Share");
         JButton sortBySize = new JButton("Order Size");
         JButton sortByDateTime = new JButton("Date/Time");
@@ -140,7 +140,7 @@ public class ClientV1 extends JFrame {
         transactionsList = new JList<>(listModel);
         transactionsList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         transactionsList.setVisibleRowCount(-1);
-        JScrollPane transactionScrollPane = new JScrollPane(transactionsList);       leftPanel.add(transactionScrollPane, BorderLayout.CENTER);
+        JScrollPane transactionScrollPane = new JScrollPane(transactionsList);       
         
         // Combine sorting buttons, search bar, and transaction list
         JPanel sortingAndSearchPanel = new JPanel(new BorderLayout(5, 5));
