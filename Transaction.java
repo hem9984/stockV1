@@ -19,7 +19,7 @@ public class Transaction implements Serializable {
 
     @Override
     public String toString() {
-        return String.format("%s | Bot: %s | Cost/Share: $%.2f | Size: %d | Date/Time: %s",
-                    ticker, bot ? "Yes" : "No", costPerShare, orderSize, dateTime);
+        return String.format("%s | Bot: %s | Price: $%.2f | Volume: %d | Time(ms): %s",
+                    ticker, bot ? "Y" : "N", costPerShare, orderSize, dateTime);
     }
 }
