@@ -198,22 +198,6 @@ class TickData {
     }
 }
 
-class Transaction implements Serializable {
-    String ticker;
-    String dateTime;
-    double costPerShare;
-    int orderSize;
-    boolean bot;
-
-    public Transaction(String ticker, String dateTime, double costPerShare, int orderSize, boolean bot) {
-        this.ticker = ticker;
-        this.dateTime = dateTime;
-        this.costPerShare = costPerShare;
-        this.orderSize = orderSize;
-        this.bot = bot;
-    }
-}
-
 public class StockV1 {
     // MariaDB Database Credentials
     private static final String DB_URL = "jdbc:mariadb://localhost:3306/StockV1";
