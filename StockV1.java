@@ -1,13 +1,6 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- */
-
 package com.mycompany.stockv1;
 
-/**
- *
- * @author hemgr
- */
+
 import com.bloomberglp.blpapi.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -15,9 +8,10 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Calendar;
 
 class BloombergDataFetcher {
-    private static final String BLOOMBERG_SERVER = "localhost";
+    private static final String BLOOMBERG_SERVER = "127.0.0.1";
     private static final int BLOOMBERG_PORT = 8194;
 
     public static List<TickData> fetchTickData(String ticker) throws Exception {
@@ -25,8 +19,8 @@ class BloombergDataFetcher {
         SessionOptions options = new SessionOptions();
         options.setServerHost(BLOOMBERG_SERVER);
         options.setServerPort(BLOOMBERG_PORT);
-
         Session session = new Session(options);
+
         if (!session.start()) {
             throw new Exception("Failed to start session.");
         }
@@ -36,10 +30,20 @@ class BloombergDataFetcher {
             Request request = refDataService.createRequest("IntradayTickRequest");
             request.set("security", ticker);
             request.append("eventTypes", "TRADE");
-            request.set("startDateTime", "2024-05-01T09:30:00");
-            request.set("endDateTime", "2024-05-01T16:00:00");
+            request.set("includeExchangeCodes", true);  // Include exchange codes
+            request.set("includeBrokerCodes", true);    // Include broker codes
 
-            session.sendRequest(request, null);
+            Calendar cStart = Calendar.getInstance();
+            cStart.add(Calendar.DAY_OF_MONTH, -2);
+            cStart.add(Calendar.MINUTE, -10);
+            request.set("startDateTime", new Datetime(cStart));
+
+            Calendar cEnd = Calendar.getInstance();
+            cEnd.add(Calendar.DAY_OF_MONTH, -1);
+            request.set("endDateTime", new Datetime(cEnd));
+
+            CorrelationID correlationId = new CorrelationID(1);
+            session.sendRequest(request, correlationId);
 
             boolean continueLoop = true;
             while (continueLoop) {
@@ -54,7 +58,10 @@ class BloombergDataFetcher {
                             long timestamp = tick.getElementAsDatetime("time").calendar().getTimeInMillis();
                             double price = tick.getElementAsFloat64("value");
                             int volume = tick.getElementAsInt32("size");
-                            tickDataList.add(new TickData(timestamp, price, volume));
+                            String exchangeCode = tick.hasElement("exchangeCode") ? tick.getElementAsString("exchangeCode") : "N/A";
+                            String brokerCode = tick.hasElement("brokerCode") ? tick.getElementAsString("brokerCode") : "N/A";
+
+                            tickDataList.add(new TickData(timestamp, price, volume, exchangeCode, brokerCode));
                         }
                         continueLoop = event.eventType() != Event.EventType.RESPONSE;
                     }
@@ -113,35 +120,43 @@ class Stock {
 
     public void classifyTickData() {
         for (TickData tick : tickData) {
-            tick.setClassification(tick.getVolume() > 1000 ? "Machine" : "Human");
+            tick.setClassification(tick.getVolume() >= 400 ? "Machine" : "Human");
         }
     }
 
     public void saveToDatabase(Connection conn) throws SQLException {
-        String insertSQL = "INSERT INTO tick_data (ticker, timestamp, price, volume, is_machine) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
-            for (TickData tick : tickData) {
-                pstmt.setString(1, tickerSymbol);
-                pstmt.setLong(2, tick.getTimestamp());
-                pstmt.setDouble(3, tick.getPrice());
-                pstmt.setInt(4, tick.getVolume());
-                pstmt.setBoolean(5, tick.getClassification().equals("Machine"));
-                pstmt.executeUpdate();
-            }
+    String insertSQL = "INSERT INTO tick_data (ticker, timestamp, price, volume, exchange_code, broker_code, is_machine) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    try (PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
+        for (TickData tick : tickData) {
+            pstmt.setString(1, tickerSymbol);
+            pstmt.setLong(2, tick.getTimestamp());
+            pstmt.setDouble(3, tick.getPrice());
+            pstmt.setInt(4, tick.getVolume());
+            pstmt.setString(5, tick.getExchangeCode());
+            pstmt.setString(6, tick.getBrokerCode());
+            pstmt.setBoolean(7, tick.getClassification().equals("Machine"));
+            pstmt.executeUpdate();
         }
     }
 }
+
+    }
+
 
 class TickData {
     private long timestamp;
     private double price;
     private int volume;
+    private String exchangeCode;
+    private String brokerCode;
     private String classification;
 
-    public TickData(long timestamp, double price, int volume) {
+    public TickData(long timestamp, double price, int volume, String exchangeCode, String brokerCode) {
         this.timestamp = timestamp;
         this.price = price;
         this.volume = volume;
+        this.exchangeCode = exchangeCode;
+        this.brokerCode = brokerCode;
     }
 
     public long getTimestamp() {
@@ -156,6 +171,14 @@ class TickData {
         return volume;
     }
 
+    public String getExchangeCode() {
+        return exchangeCode;
+    }
+
+    public String getBrokerCode() {
+        return brokerCode;
+    }
+
     public String getClassification() {
         return classification;
     }
@@ -166,17 +189,17 @@ class TickData {
 
     @Override
     public String toString() {
-        return String.format("Time: %d, Price: %.2f, Volume: %d, Classification: %s",
-                             timestamp, price, volume, classification);
+        return String.format("Time: %d, Price: %.2f, Volume: %d, Exchange: %s, Broker: %s, Classification: %s",
+                             timestamp, price, volume, exchangeCode, brokerCode, classification);
     }
 }
 
 public class StockV1 {
     // MariaDB Database Credentials
-    private static final String DB_URL = "jdbc:mariadb://localhost:3306/market_data";
-    private static final String DB_USER = "your_username";
-    private static final String DB_PASSWORD = "your_password";
-
+    private static final String DB_URL = "jdbc:mariadb://localhost:3306/StockV1";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "Sinatra147!";
+    
     public static void main(String[] args) {
         // Create sector and stock
         Sector sector = new Sector("S&P 500");
@@ -184,7 +207,13 @@ public class StockV1 {
 
         // Fetch data from Bloomberg API
         try {
+            System.out.println("Fetching data from Bloomberg API...");
             List<TickData> tickDataList = BloombergDataFetcher.fetchTickData("AAPL US Equity");
+            if (tickDataList.isEmpty()) {
+                System.out.println("No data received from Bloomberg API.");
+            } else {
+                System.out.println("Data received: " + tickDataList.size() + " ticks");
+            }
             stock.setTickData(tickDataList);
         } catch (Exception e) {
             System.err.println("Error fetching Bloomberg data: " + e.getMessage());
@@ -192,6 +221,7 @@ public class StockV1 {
         }
 
         // Classify tick data
+        System.out.println("Classifying tick data...");
         stock.classifyTickData();
 
         // Add stock to sector
@@ -206,6 +236,21 @@ public class StockV1 {
         } catch (SQLException e) {
             System.err.println("SQL Exception: " + e.getMessage());
         }
+        
+        // Print transactions
+        System.out.println("Printing transactions...");
+        printTransactions(stock);
+    }
+
+    // Function to print transactions of the given stock
+    private static void printTransactions(Stock stock) {
+        System.out.println("Transactions for ticker: " + stock.getTickerSymbol());
+        List<TickData> tickDataList = stock.getTickData();
+        for (TickData tickData : tickDataList) {
+            System.out.println(tickData);
+        }
+        if (tickDataList.isEmpty()) {
+            System.out.println("No transaction data available to print.");
+        }
     }
 }
-
