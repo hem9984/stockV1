@@ -1,14 +1,4 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
-package com.mycompany.stockv1;
-
-/**
- *
- * @author hemgr
- */
-
+package com.mycompany.stockmarketanalysisui;
 
 /**
  *
@@ -18,43 +8,45 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ArrayList;
+import java.io.*;
+import java.net.Socket;
 
-public class ClientV1 extends JFrame {
+public class StockMarketAnalysisUI extends JFrame {
     private JList<Transaction> transactionsList;
-    private final DefaultListModel<Transaction> listModel;
-    private final JPanel detailsPanel;
-    private final ProbabilityGraphPanel graphPanel;
+    private DefaultListModel<Transaction> listModel;
+    private JPanel detailsPanel;
+    private ProbabilityGraphPanel graphPanel;
     private JTextField searchBar;
-    private boolean sortProbAsc = false;
     private boolean sortCostAsc = false;
     private boolean sortSizeAsc = false;
     private boolean sortDateAsc = false;
+    private boolean sortBotAsc = false;
 
     // Mock transaction class to hold relevant data
-    private static class Transaction {
+    private static class Transaction implements Serializable {
         String ticker;
-        int probability; // 0-100
+        boolean bot;
         double costPerShare;
         int orderSize;
         String dateTime;
-        boolean highProbability; // for indicator color
 
-        public Transaction(String ticker, int probability, double costPerShare, int orderSize, String dateTime, boolean highProbability) {
+        public Transaction(String ticker, boolean bot, double costPerShare, int orderSize, String dateTime) {
             this.ticker = ticker;
-            this.probability = probability;
+            this.bot = bot;
             this.costPerShare = costPerShare;
             this.orderSize = orderSize;
             this.dateTime = dateTime;
-            this.highProbability = highProbability;
         }
 
         @Override
         public String toString() {
-            return String.format("%s | Prob: %d%% | Cost/Share: $%.2f | Size: %d | Date/Time: %s",
-                    ticker, probability, costPerShare, orderSize, dateTime);
+            String botLabel = bot ? "Bot: Yes" : "Bot: No";
+            return String.format("%s | %s | Cost/Share: $%.2f | Size: %d | Date/Time: %s",
+                    ticker, botLabel, costPerShare, orderSize, dateTime);
         }
     }
 
@@ -82,13 +74,12 @@ public class ClientV1 extends JFrame {
 
         private void drawPlaceholderGraph(Graphics g) {
             g.setColor(Color.BLACK);
-            g.drawString("Probability Distribution Graph", 140, 20);
+            g.drawString("Probability Distribution Graph", 110, 20);
 
             // Simulate a normal distribution curve
             g.setColor(Color.BLUE);
-            // int[] xPoints = {110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310};
-            int[] xPoints = {115, 125, 135, 145, 155, 165, 175, 185, 195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295, 305, 315};
-            int[] yPoints = {190, 180, 170, 155, 135, 120, 100, 90, 70, 60, 55, 60, 70, 90, 100, 120, 135, 155, 170, 180, 190};
+            int[] xPoints = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360, 370, 380, 390};
+            int[] yPoints = {190, 180, 170, 155, 135, 120, 100, 90, 70, 60, 55, 60, 70, 90, 100, 120, 135, 155, 170, 180, 190, 180, 170, 155, 135, 120, 100, 90, 70, 60, 55, 60, 70, 90, 100, 120, 135, 155, 170};
             g.drawPolyline(xPoints, yPoints, xPoints.length);
         }
     }
@@ -98,26 +89,27 @@ public class ClientV1 extends JFrame {
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
             JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-            if (value instanceof Transaction transaction) {
+            if (value instanceof Transaction) {
+                Transaction transaction = (Transaction) value;
                 label.setText(transaction.toString());
-                label.setIcon(new IndicatorIcon(transaction.probability));
+                label.setIcon(new IndicatorIcon(transaction.bot));
             }
             return label;
         }
     }
 
-    // Custom icon that changes color based on the probability value
+    // Custom icon that changes color based on whether it's a bot or not
     private static class IndicatorIcon implements Icon {
         private final int size = 10;
-        private final int probability;
+        private final boolean bot;
 
-        public IndicatorIcon(int probability) {
-            this.probability = probability;
+        public IndicatorIcon(boolean bot) {
+            this.bot = bot;
         }
 
         @Override
         public void paintIcon(Component c, Graphics g, int x, int y) {
-            g.setColor(getColorByProbability(probability));
+            g.setColor(bot ? Color.GREEN : Color.RED);
             g.fillOval(x, y, size, size);
         }
 
@@ -130,20 +122,9 @@ public class ClientV1 extends JFrame {
         public int getIconHeight() {
             return size;
         }
-
-        // Determines color based on the probability
-        private Color getColorByProbability(int probability) {
-            if (probability >= 50) {
-                int lightnessFactor = (int) ((probability - 50) * 5.1); // 0 to 255
-                return new Color(255 - lightnessFactor, 255, 255 - lightnessFactor); // Light green to dark green
-            } else {
-                int lightnessFactor = (int) ((50 - probability) * 5.1); // 0 to 255
-                return new Color(255, 255 - lightnessFactor, 255 - lightnessFactor); // Light red to dark red
-            }
-        }
     }
 
-    public ClientV1() {
+    public StockMarketAnalysisUI() {
         // Initialize main frame
         setTitle("Stock Market Analysis");
         setSize(900, 600);
@@ -156,15 +137,15 @@ public class ClientV1 extends JFrame {
 
         // Sorting buttons
         JPanel sortButtons = new JPanel(new GridLayout(1, 4, 5, 0));
-        JButton sortByProb = new JButton("Probability");
+        JButton sortByBot = new JButton("Bot");
         JButton sortByCost = new JButton("Cost/Share");
         JButton sortBySize = new JButton("Order Size");
         JButton sortByDateTime = new JButton("Date/Time");
-        sortByProb.addActionListener(e -> sortByProbability());
+        sortByBot.addActionListener(e -> sortByBot());
         sortByCost.addActionListener(e -> sortByCostPerShare());
         sortBySize.addActionListener(e -> sortByOrderSize());
         sortByDateTime.addActionListener(e -> sortByDateTime());
-        sortButtons.add(sortByProb);
+        sortButtons.add(sortByBot);
         sortButtons.add(sortByCost);
         sortButtons.add(sortBySize);
         sortButtons.add(sortByDateTime);
@@ -183,18 +164,11 @@ public class ClientV1 extends JFrame {
 
         // List of transactions
         listModel = new DefaultListModel<>();
-        for (int i = 1; i <= 10; i++) {
-            boolean highProbability = (i * 10) > 50;
-            listModel.addElement(new Transaction("ABC" + i, i * 10, 20.0 + i, 100 + i * 10, "2024-05-01 14:00", highProbability));
-        }
-
         transactionsList = new JList<>(listModel);
-        transactionsList.setCellRenderer(new TransactionCellRenderer());
         transactionsList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         transactionsList.setVisibleRowCount(-1);
-        transactionsList.addListSelectionListener(e -> updateDetailsPanel(transactionsList.getSelectedIndex()));
-        JScrollPane transactionScrollPane = new JScrollPane(transactionsList);
-
+        JScrollPane transactionScrollPane = new JScrollPane(transactionsList);       leftPanel.add(transactionScrollPane, BorderLayout.CENTER);
+        
         // Combine sorting buttons, search bar, and transaction list
         JPanel sortingAndSearchPanel = new JPanel(new BorderLayout(5, 5));
         sortingAndSearchPanel.add(sortButtons, BorderLayout.NORTH);
@@ -232,6 +206,31 @@ public class ClientV1 extends JFrame {
         // Add left and right panels to the frame
         add(leftPanel);
         add(rightPanel);
+        
+        // Fetch data from the server
+        fetchTransactionsFromServer();
+    }
+    
+    private void fetchTransactionsFromServer() {
+        String serverAddress = "10.18.185.141";
+        int serverPort = 12345;
+
+        try (Socket socket = new Socket(serverAddress, serverPort);
+             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+
+            // Receive the list of transactions from the server
+            List<Transaction> transactions = (List<Transaction>) in.readObject();
+
+            // Clear the current list and add the fetched transactions
+            listModel.clear();
+            for (Transaction transaction : transactions) {
+                listModel.addElement(transaction);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Unable to fetch transactions from server.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     // Updates the details panel with data from the selected transaction
@@ -241,7 +240,7 @@ public class ClientV1 extends JFrame {
             Transaction transaction = listModel.get(index);
             detailsPanel.add(new JLabel("Transaction Details:"));
             detailsPanel.add(new JLabel("Ticker: " + transaction.ticker));
-            detailsPanel.add(new JLabel("Probability: " + transaction.probability + "%"));
+            detailsPanel.add(new JLabel("Bot: " + (transaction.bot ? "Yes" : "No")));
             detailsPanel.add(new JLabel("Cost/Share: $" + transaction.costPerShare));
             detailsPanel.add(new JLabel("Order Size: " + transaction.orderSize));
             detailsPanel.add(new JLabel("Date/Time: " + transaction.dateTime));
@@ -271,15 +270,15 @@ public class ClientV1 extends JFrame {
     }
 
     // Sorting by different attributes
-    private void sortByProbability() {
+    private void sortByBot() {
         List<Transaction> transactions = new ArrayList<>();
         for (int i = 0; i < listModel.size(); i++) {
             transactions.add(listModel.get(i));
         }
 
-        Comparator<Transaction> comparator = Comparator.comparingInt(t -> t.probability);
-        transactions.sort(sortProbAsc ? comparator : comparator.reversed());
-        sortProbAsc = !sortProbAsc;
+        Comparator<Transaction> comparator = Comparator.comparing(t -> t.bot);
+        transactions.sort(sortBotAsc ? comparator : comparator.reversed());
+        sortBotAsc = !sortBotAsc;
 
         listModel.clear();
         for (Transaction t : transactions) {
@@ -337,7 +336,7 @@ public class ClientV1 extends JFrame {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            ClientV1 app = new ClientV1();
+            StockMarketAnalysisUI app = new StockMarketAnalysisUI();
             app.setVisible(true);
         });
     }
