@@ -6,9 +6,13 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Calendar;
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
 
 class BloombergDataFetcher {
     private static final String BLOOMBERG_SERVER = "127.0.0.1";
@@ -194,11 +198,30 @@ class TickData {
     }
 }
 
+class Transaction implements Serializable {
+    String ticker;
+    String dateTime;
+    double costPerShare;
+    int orderSize;
+    boolean bot;
+
+    public Transaction(String ticker, String dateTime, double costPerShare, int orderSize, boolean bot) {
+        this.ticker = ticker;
+        this.dateTime = dateTime;
+        this.costPerShare = costPerShare;
+        this.orderSize = orderSize;
+        this.bot = bot;
+    }
+}
+
 public class StockV1 {
     // MariaDB Database Credentials
     private static final String DB_URL = "jdbc:mariadb://localhost:3306/StockV1";
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD = "Sinatra147!";
+    
+    // Networking Port
+    private static final int PORT = 12345;
     
     public static void main(String[] args) {
         // Create sector and stock
@@ -240,6 +263,56 @@ public class StockV1 {
         // Print transactions
         System.out.println("Printing transactions...");
         printTransactions(stock);
+        
+        // Send data to client
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+            System.out.println("Server listening on port " + PORT);
+
+            while (true) {
+                try (Socket clientSocket = serverSocket.accept();
+                     ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
+
+                    System.out.println("Client connected. Fetching data from database...");
+
+                    List<Transaction> transactions = fetchTransactionsFromDatabase();
+                    out.writeObject(transactions);
+                    out.flush();
+                    System.out.println("Data sent to client.");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Fetch data back from database
+    private static List<Transaction> fetchTransactionsFromDatabase() {
+        List<Transaction> transactions = new ArrayList<>();
+        String url = "jdbc:mariadb://localhost:3306/yourDatabase";
+        String username = "yourUsername";
+        String password = "yourPassword";
+
+        String query = "SELECT ticker, timestamp, price, volume, is_machine FROM yourTable";
+
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                String ticker = rs.getString("ticker");
+                String dateTime = rs.getString("timestamp");
+                double costPerShare = rs.getDouble("price");
+                int orderSize = rs.getInt("volume");
+                boolean bot = rs.getBoolean("is_machine");
+
+                transactions.add(new Transaction(ticker, dateTime, costPerShare, orderSize, bot));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return transactions;
     }
 
     // Function to print transactions of the given stock
