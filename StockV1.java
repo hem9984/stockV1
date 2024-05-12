@@ -200,9 +200,9 @@ class TickData {
 
 public class StockV1 {
     // MariaDB Database Credentials
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/StockV1";
+    private static final String DB_URL = "jdbc:mariadb://localhost:3306/StockV1";
     private static final String DB_USER = "root";
-    private static final String DB_PASSWORD = "H0tR0d-505";
+    private static final String DB_PASSWORD = "Sinatra147!";
     
     // Networking Port
     private static final int PORT = 12345;
