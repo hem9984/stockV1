@@ -202,7 +202,7 @@ public class StockV1 {
     // MariaDB Database Credentials
     private static final String DB_URL = "jdbc:mariadb://localhost:3306/StockV1";
     private static final String DB_USER = "root";
-    private static final String DB_PASSWORD = "Sinatra147!";
+    private static final String DB_PASSWORD = "5432";
     
     // Networking Port
     private static final int PORT = 12345;
