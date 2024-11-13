@@ -1,3 +1,1 @@
-# stockV1
-bot or not
-bot
+Tool that works with with bloomberg api (need to change api key, we made this using bloomberg api simulator). has a GUI, and determins if live bloomberg api transactions were placed by a bot or a human.
