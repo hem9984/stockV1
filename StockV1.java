@@ -122,6 +122,7 @@ class Stock {
         return tickerSymbol;
     }
 
+    // replace with your fancy algorithm ;)
     public void classifyTickData() {
         for (TickData tick : tickData) {
             tick.setClassification(tick.getVolume() >= 400 ? "Machine" : "Human");
